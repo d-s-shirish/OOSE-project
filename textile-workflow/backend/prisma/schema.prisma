@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Module 1: Raw Data Entry & QR Tracker
+model RawBatch {
+  id          String   @id @default(uuid())
+  externalId  String   @unique // The "Manual" Batch ID (SRS 4.1.1)
+  material    String
+  weightKg    Float
+  supplier    String
+  status      String   @default("PENDING")
+  encryptedQr String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  processes   ProductionProcess[]
+  exports     ExportDocument[]
+  wastes      WasteRecord[]
+}
+
+// Module 2: Chemical Tracker
+model ChemicalResource {
+  id             String  @id @default(uuid())
+  name           String
+  currentLiters  Float
+  depletionRate  Float   // Liters per Kg of material
+  threshold50    Boolean @default(false)
+  threshold20    Boolean @default(false)
+}
+
+// Module 3: Production Tracker
+model ProductionProcess {
+  id            String   @id @default(uuid())
+  batchId       String
+  machineId     String
+  machineRpm    Int
+  estimatedHrs  Float
+  status        String   @default("IN_PROGRESS")
+  startTime     DateTime @default(now())
+  endTime       DateTime?
+  chemicalUsed  Float?
+  
+  batch         RawBatch @relation(fields: [batchId], references: [id])
+}
+
+// Module 4: Waste Circulation
+model WasteRecord {
+  id              String   @id @default(uuid())
+  batchId         String
+  type            String   // Biodegradable / Non-Bio (SRS 4.4.2)
+  quantityKg      Float
+  upcycleGuidance String?
+  recordedAt      DateTime @default(now())
+
+  batch           RawBatch @relation(fields: [batchId], references: [id])
+}
+
+// Module 5: Compliance Tracker
+model ComplianceLog {
+  id          String   @id @default(uuid())
+  parameter   String   // e.g., Water pH, CO2 Emissions
+  value       Float
+  isCompliant Boolean
+  recordedAt  DateTime @default(now())
+}
+
+// Module 6: Export Template
+model ExportDocument {
+  id          String   @id @default(uuid())
+  batchId     String
+  batch       RawBatch @relation(fields: [batchId], references: [id])
+  type        String   // INVOICE, CERTIFICATE, COMPLIANCE_REPORT
+  url         String?  // Made optional as some documents might be generated without an immediate URL
+  hsCode      String?  @default("HS-0000")
+  gstNumber   String?  @default("29AAAAA0000A1Z0")
+  isSigned    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
